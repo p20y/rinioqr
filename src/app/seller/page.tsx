@@ -19,7 +19,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { PrintStickerDialog } from '@/components/PrintStickerDialog'
 
 interface Product {
     id: string
@@ -93,7 +92,6 @@ export default function SellerPage() {
     const [loading, setLoading] = useState(false)
     const [fetchLoading, setFetchLoading] = useState(true)
     const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-    const [productToPrint, setProductToPrint] = useState<Product | null>(null)
     const [urlError, setUrlError] = useState('')
 
     useEffect(() => {
@@ -384,9 +382,11 @@ export default function SellerPage() {
                                                     >
                                                         {product.is_active ? 'Disable' : 'Enable'}
                                                     </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => setProductToPrint(product)}>
-                                                        <Printer className="h-4 w-4 mr-2" />
-                                                        Print
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/print/${product.id}`}>
+                                                            <Printer className="h-4 w-4 mr-2" />
+                                                            Print
+                                                        </Link>
                                                     </Button>
                                                     <Button variant="outline" size="sm" asChild>
                                                         <a href={`/p/${product.id}`} target="_blank" rel="noopener noreferrer">
@@ -441,14 +441,6 @@ export default function SellerPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
-            {/* Print Sticker Dialog */}
-            <PrintStickerDialog
-                product={productToPrint}
-                open={!!productToPrint}
-                onOpenChange={(open) => !open && setProductToPrint(null)}
-                origin={origin}
-            />
         </div>
     )
 }
