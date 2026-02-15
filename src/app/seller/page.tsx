@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { QRCodeSVG } from 'qrcode.react'
 import { Trash2, ExternalLink, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Product {
     id: string
@@ -24,6 +34,7 @@ export default function SellerPage() {
     const [asin, setAsin] = useState('')
     const [loading, setLoading] = useState(false)
     const [fetchLoading, setFetchLoading] = useState(true)
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null)
 
     useEffect(() => {
         fetchProducts()
@@ -65,21 +76,25 @@ export default function SellerPage() {
         setLoading(false)
     }
 
-    const deleteProduct = async (id: string) => {
-        const confirmDelete = window.confirm('Are you sure you want to delete this product?')
-        if (!confirmDelete) return
+    const handleDeleteClick = (product: Product) => {
+        setProductToDelete(product)
+    }
+
+    const confirmDelete = async () => {
+        if (!productToDelete) return
 
         const { error } = await supabase
             .from('products')
             .delete()
-            .match({ id })
+            .match({ id: productToDelete.id })
 
         if (error) {
             console.error('Error deleting product:', error)
             alert('Error deleting product')
         } else {
-            setProducts(products.filter(p => p.id !== id))
+            setProducts(products.filter(p => p.id !== productToDelete.id))
         }
+        setProductToDelete(null)
     }
 
     const toggleActive = async (product: Product) => {
@@ -188,7 +203,7 @@ export default function SellerPage() {
                                                             Test Link
                                                         </a>
                                                     </Button>
-                                                    <Button variant="destructive" size="sm" onClick={() => deleteProduct(product.id)}>
+                                                    <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(product)}>
                                                         <Trash2 className="h-4 w-4 mr-2" />
                                                         Delete
                                                     </Button>
