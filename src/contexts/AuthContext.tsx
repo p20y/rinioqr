@@ -159,6 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider: 'google',
         options: {
           redirectTo: callbackUrl.toString(),
+          // Don't skip browser redirect - let Supabase handle the flow
+          skipBrowserRedirect: false,
+          // Add query params for better Google OAuth experience
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       })
 

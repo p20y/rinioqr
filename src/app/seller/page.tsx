@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { QRCodeSVG } from 'qrcode.react'
 import { Trash2, ExternalLink, RefreshCw, Printer, LogOut, Crown } from 'lucide-react'
 import Link from 'next/link'
+import { AuthDebug } from '@/components/AuthDebug'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -557,6 +558,9 @@ export default function SellerPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Debug component - shows auth state */}
+            <AuthDebug />
         </div>
     )
 }
