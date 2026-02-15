@@ -177,19 +177,20 @@ export default function SellerPage() {
         setLoading(true)
         const { data, error } = await supabase
             .from('products')
-            .insert([{
+            .insert({
                 name,
                 asin,
                 marketplace,
                 image_url: imageUrl || null
-            }])
+            })
             .select()
+            .single()
 
-        if (error) {
+        if (error || !data) {
             console.error('Error adding product:', error)
             alert('Error adding product')
         } else {
-            setProducts([data[0], ...products])
+            setProducts([data, ...products])
             setProductUrl('')
             setName('')
             setAsin('')

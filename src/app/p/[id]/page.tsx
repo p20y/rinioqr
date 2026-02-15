@@ -38,18 +38,24 @@ export default function ConsumerPage() {
             .eq('id', productId)
             .single()
 
-        if (error) {
+        setLoading(false)
+
+        if (error || !data) {
             console.error('Error fetching product:', error)
             setError('Product not found or invalid QR code.')
-        } else {
-            if (!data.is_active) {
-                // Redirect to Amazon Product Page if disabled (using correct marketplace)
-                window.location.href = `https://${data.marketplace}/dp/${data.asin}`
-                return
-            }
-            setProduct(data)
+            return
         }
-        setLoading(false)
+
+        // Type assertion to help TypeScript understand the data structure
+        const product = data as Product
+
+        if (!product.is_active) {
+            // Redirect to Amazon Product Page if disabled (using correct marketplace)
+            window.location.href = `https://${product.marketplace}/dp/${product.asin}`
+            return
+        }
+
+        setProduct(product)
     }
 
     const handleLeaveReview = () => {
