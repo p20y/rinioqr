@@ -57,7 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return fetchUserMetadata(userId, retries - 1)
         }
 
-        console.error('Error fetching user metadata:', error)
+        console.error('Error fetching user metadata:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId
+        })
         return null
       }
 
@@ -177,11 +183,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign out
   const signOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setUserMetadata(null)
-    // Hard redirect to login to ensure clean state
-    window.location.href = '/login'
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserMetadata(null)
+    } catch (error) {
+      console.error('Error signing out:', error)
+    } finally {
+      // Always redirect to login, even if signOut fails
+      window.location.replace('/login')
+    }
   }
 
   // Refresh user metadata (called after subscription changes)

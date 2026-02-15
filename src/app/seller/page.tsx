@@ -259,8 +259,16 @@ export default function SellerPage() {
     }
 
     const handleSignOut = async () => {
-        // signOut() will handle the redirect to /login
-        await signOut()
+        try {
+            console.log('Sign out button clicked')
+            await supabase.auth.signOut()
+            console.log('Supabase sign out complete, redirecting...')
+            window.location.href = '/login'
+        } catch (error) {
+            console.error('Sign out error:', error)
+            // Force redirect anyway
+            window.location.href = '/login'
+        }
     }
 
     const toggleActive = async (product: Product) => {
