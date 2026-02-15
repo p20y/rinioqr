@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { QRCodeSVG } from 'qrcode.react'
-import { Trash2, ExternalLink, RefreshCw, Printer } from 'lucide-react'
+import { Trash2, ExternalLink, RefreshCw, Printer, LogOut, Crown } from 'lucide-react'
 import Link from 'next/link'
 import {
     AlertDialog,
@@ -19,6 +21,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+    Alert,
+    AlertDescription
+} from "@/components/ui/alert"
 
 interface Product {
     id: string
@@ -83,6 +89,8 @@ function parseAmazonUrl(url: string): { asin: string; marketplace: string } | nu
 }
 
 export default function SellerPage() {
+    const router = useRouter()
+    const { user, userMetadata, signOut, canAddProduct, refreshUserMetadata } = useAuth()
     const [products, setProducts] = useState<Product[]>([])
     const [productUrl, setProductUrl] = useState('')
     const [name, setName] = useState('')
@@ -93,16 +101,22 @@ export default function SellerPage() {
     const [fetchLoading, setFetchLoading] = useState(true)
     const [productToDelete, setProductToDelete] = useState<Product | null>(null)
     const [urlError, setUrlError] = useState('')
+    const [showLimitWarning, setShowLimitWarning] = useState(false)
 
     useEffect(() => {
-        fetchProducts()
-    }, [])
+        if (user) {
+            fetchProducts()
+        }
+    }, [user])
 
     const fetchProducts = async () => {
+        if (!user) return
+
         setFetchLoading(true)
         const { data, error } = await supabase
             .from('products')
             .select('*')
+            .eq('user_id', user.id)
             .order('created_at', { ascending: false })
 
         if (error) {
@@ -174,6 +188,17 @@ export default function SellerPage() {
             return
         }
 
+        // Check product limit
+        if (!canAddProduct()) {
+            setShowLimitWarning(true)
+            return
+        }
+
+        if (!user) {
+            alert('You must be logged in to add products')
+            return
+        }
+
         setLoading(true)
         const { data, error } = await supabase
             .from('products')
@@ -181,7 +206,8 @@ export default function SellerPage() {
                 name,
                 asin,
                 marketplace,
-                image_url: imageUrl || null
+                image_url: imageUrl || null,
+                user_id: user.id
             })
             .select()
             .single()
@@ -196,6 +222,8 @@ export default function SellerPage() {
             setAsin('')
             setMarketplace('')
             setImageUrl('')
+            // Refresh user metadata to update product count
+            await refreshUserMetadata()
         }
         setLoading(false)
     }
@@ -217,8 +245,15 @@ export default function SellerPage() {
             alert('Error deleting product')
         } else {
             setProducts(products.filter(p => p.id !== productToDelete.id))
+            // Refresh user metadata to update product count
+            await refreshUserMetadata()
         }
         setProductToDelete(null)
+    }
+
+    const handleSignOut = async () => {
+        await signOut()
+        router.push('/login')
     }
 
     const toggleActive = async (product: Product) => {
@@ -246,12 +281,87 @@ export default function SellerPage() {
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-4xl mx-auto space-y-8">
 
-                <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-                    <Button variant="outline" asChild>
-                        <Link href="/">Back to Home</Link>
+                {/* Header with User Info */}
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+                        {userMetadata && (
+                            <p className="text-sm text-gray-600 mt-1">
+                                Welcome back, {userMetadata.full_name || userMetadata.email}
+                            </p>
+                        )}
+                    </div>
+                    <Button variant="outline" onClick={handleSignOut}>
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
                     </Button>
                 </div>
+
+                {/* Usage Stats Card */}
+                {userMetadata && (
+                    <Card className={`border-2 ${userMetadata.current_product_count >= userMetadata.product_limit ? 'border-amber-500 bg-amber-50' : 'border-blue-500 bg-blue-50'}`}>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-semibold capitalize">
+                                            {userMetadata.subscription_status} Plan
+                                        </h3>
+                                        {userMetadata.subscription_status !== 'free' && (
+                                            <Crown className="h-5 w-5 text-amber-500" />
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-600">
+                                        Products: <span className="font-semibold">{userMetadata.current_product_count} / {userMetadata.product_limit}</span>
+                                    </p>
+                                    {userMetadata.total_scans > 0 && (
+                                        <p className="text-sm text-gray-600">
+                                            Total QR Scans: <span className="font-semibold">{userMetadata.total_scans.toLocaleString()}</span>
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    {userMetadata.current_product_count >= userMetadata.product_limit ? (
+                                        <Button onClick={() => router.push('/billing')} variant="default">
+                                            Upgrade Plan
+                                        </Button>
+                                    ) : userMetadata.subscription_status === 'free' && (
+                                        <Button onClick={() => router.push('/billing')} variant="outline">
+                                            Upgrade to unlock more
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Limit Warning Alert */}
+                {showLimitWarning && (
+                    <Alert variant="destructive">
+                        <AlertDescription className="flex items-center justify-between">
+                            <span>
+                                You've reached your product limit ({userMetadata?.product_limit} products).
+                                Upgrade your plan to add more products.
+                            </span>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowLimitWarning(false)}
+                                >
+                                    Dismiss
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={() => router.push('/billing')}
+                                >
+                                    Upgrade Now
+                                </Button>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Add Product Form */}
                 <Card>
