@@ -188,6 +188,12 @@ export default function SellerPage() {
             return
         }
 
+        // Wait for user metadata to load
+        if (!userMetadata) {
+            alert('Loading your account information, please try again in a moment...')
+            return
+        }
+
         // Check product limit
         if (!canAddProduct()) {
             setShowLimitWarning(true)
@@ -418,8 +424,8 @@ export default function SellerPage() {
                                         </div>
                                     )}
 
-                                    <Button type="submit" disabled={loading} className="w-full">
-                                        {loading ? 'Adding...' : 'Generate QR Code'}
+                                    <Button type="submit" disabled={loading || !userMetadata} className="w-full">
+                                        {loading ? 'Adding...' : !userMetadata ? 'Loading...' : 'Generate QR Code'}
                                     </Button>
                                 </>
                             )}
