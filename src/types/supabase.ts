@@ -16,6 +16,7 @@ export interface Database {
                     created_at: string
                     name: string
                     asin: string
+                    marketplace: string
                     image_url: string | null
                     is_active: boolean
                 }
@@ -24,6 +25,7 @@ export interface Database {
                     created_at?: string
                     name: string
                     asin: string
+                    marketplace: string
                     image_url?: string | null
                     is_active?: boolean
                 }
@@ -32,6 +34,7 @@ export interface Database {
                     created_at?: string
                     name?: string
                     asin?: string
+                    marketplace?: string
                     image_url?: string | null
                     is_active?: boolean
                 }

@@ -11,6 +11,8 @@ interface Product {
     id: string
     name: string
     asin: string
+    marketplace: string
+    image_url: string | null
     is_active: boolean
 }
 
@@ -41,8 +43,8 @@ export default function ConsumerPage() {
             setError('Product not found or invalid QR code.')
         } else {
             if (!data.is_active) {
-                // Redirect to Amazon Product Page if disabled
-                window.location.href = `https://www.amazon.in/dp/${data.asin}`
+                // Redirect to Amazon Product Page if disabled (using correct marketplace)
+                window.location.href = `https://${data.marketplace}/dp/${data.asin}`
                 return
             }
             setProduct(data)
@@ -52,8 +54,8 @@ export default function ConsumerPage() {
 
     const handleLeaveReview = () => {
         if (!product) return
-        // Deep link to Amazon Create Review page
-        const amazonReviewUrl = `https://www.amazon.in/review/create-review?asin=${product.asin}`
+        // Deep link to Amazon Create Review page (using correct marketplace)
+        const amazonReviewUrl = `https://${product.marketplace}/review/create-review?asin=${product.asin}`
         window.location.href = amazonReviewUrl
     }
 
@@ -84,10 +86,25 @@ export default function ConsumerPage() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
             <Card className="max-w-md w-full shadow-lg border-orange-100">
-                <CardHeader className="text-center space-y-2">
-                    <div className="mx-auto bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mb-2">
-                        <Star className="h-8 w-8 text-orange-500 fill-orange-500" />
-                    </div>
+                <CardHeader className="text-center space-y-4">
+                    {/* Product Image */}
+                    {product.image_url ? (
+                        <div className="mx-auto mb-2">
+                            <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="h-32 object-contain mx-auto rounded"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <div className="mx-auto bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mb-2">
+                            <Star className="h-8 w-8 text-orange-500 fill-orange-500" />
+                        </div>
+                    )}
+
                     <CardTitle className="text-2xl font-bold text-gray-900">Enjoying your purchase?</CardTitle>
                     <CardDescription className="text-lg text-gray-600">
                         We'd love to hear your feedback on: <br />
@@ -109,7 +126,7 @@ export default function ConsumerPage() {
                         Leave a Review on Amazon
                     </Button>
                     <p className="text-xs text-center text-gray-400 mt-2">
-                        You will be redirected to Amazon.com securely.
+                        You will be redirected to {product.marketplace} securely.
                     </p>
                 </CardFooter>
             </Card>
