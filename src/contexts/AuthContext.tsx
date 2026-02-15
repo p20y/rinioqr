@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   // Fetch user metadata from users_metadata table
-  const fetchUserMetadata = async (userId: string): Promise<UserMetadata | null> => {
+  const fetchUserMetadata = async (userId: string, retries = 3): Promise<UserMetadata | null> => {
     try {
       const { data, error } = await supabase
         .from('users_metadata')
@@ -49,6 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (error) {
+        // If no rows found and we have retries left, wait and try again
+        // This handles the race condition where user is created but metadata isn't yet
+        if (error.code === 'PGRST116' && retries > 0) {
+          console.log(`Metadata not found for user ${userId}, retrying... (${retries} retries left)`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return fetchUserMetadata(userId, retries - 1)
+        }
+
         console.error('Error fetching user metadata:', error)
         return null
       }
@@ -94,16 +102,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
       })
 
       if (error) return { error }
 
-      // Update user metadata with full name
+      // Wait a bit for the trigger to create metadata, then update full name
       if (data.user) {
-        await supabase
-          .from('users_metadata')
-          .update({ full_name: fullName })
-          .eq('id', data.user.id)
+        // Retry logic to handle race condition
+        let retries = 3
+        while (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          const { error: updateError } = await supabase
+            .from('users_metadata')
+            .update({ full_name: fullName })
+            .eq('id', data.user.id)
+
+          if (!updateError) break
+          retries--
+        }
       }
 
       return { error: null }

@@ -13,24 +13,50 @@ function AuthCallbackContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const exchangeSession = async () => {
-      const code = searchParams.get('code')
-      if (!code) {
-        setError('Missing authentication code. Please try signing in again.')
-        return
+    const handleCallback = async () => {
+      try {
+        // The Supabase client will automatically handle the OAuth callback
+        // and set the session from URL fragments or query params
+
+        // Check if we have a code in the URL (PKCE flow)
+        const code = searchParams.get('code')
+
+        if (code) {
+          // Exchange the code for a session
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+          if (exchangeError) {
+            console.error('Error exchanging code:', exchangeError)
+            setError(exchangeError.message)
+            return
+          }
+        }
+
+        // Wait a moment for the session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // Check if we now have a session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError || !session) {
+          console.error('No session after callback:', sessionError)
+          setError('Failed to establish session. Please try signing in again.')
+          setTimeout(() => router.push('/login'), 2000)
+          return
+        }
+
+        console.log('✅ Session established for:', session.user.email)
+
+        // Redirect to the intended destination
+        router.push(safeRedirectTo)
+      } catch (err) {
+        console.error('Callback error:', err)
+        setError('An unexpected error occurred. Please try again.')
+        setTimeout(() => router.push('/login'), 2000)
       }
-
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-
-      if (exchangeError) {
-        setError(exchangeError.message)
-        return
-      }
-
-      router.replace(safeRedirectTo)
     }
 
-    exchangeSession()
+    handleCallback()
   }, [router, searchParams, safeRedirectTo])
 
   return (
@@ -38,13 +64,18 @@ function AuthCallbackContent() {
       <div className="flex justify-center">
         <QrCode className="h-12 w-12 text-blue-600" />
       </div>
-      <h1 className="text-2xl font-semibold text-gray-900">Signing you in</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">
+        {error ? 'Sign In Failed' : 'Signing you in'}
+      </h1>
       {error ? (
-        <p className="text-sm text-red-600">{error}</p>
+        <div className="space-y-2">
+          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-xs text-gray-500">Redirecting to login...</p>
+        </div>
       ) : (
         <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Finalizing your session...
+          Setting up your session...
         </div>
       )}
     </div>
