@@ -180,6 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
     setUser(null)
     setUserMetadata(null)
+    // Hard redirect to login to ensure clean state
+    window.location.href = '/login'
   }
 
   // Refresh user metadata (called after subscription changes)

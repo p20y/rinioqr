@@ -259,8 +259,8 @@ export default function SellerPage() {
     }
 
     const handleSignOut = async () => {
+        // signOut() will handle the redirect to /login
         await signOut()
-        router.push('/login')
     }
 
     const toggleActive = async (product: Product) => {
