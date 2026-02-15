@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as cheerio from 'cheerio'
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
@@ -10,80 +11,86 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Try multiple Amazon image URL formats
-        const imageFormats = [
-            `https://images-na.ssl-images-amazon.com/images/P/${asin}.jpg`,
-            `https://m.media-amazon.com/images/I/${asin}.jpg`,
-            `https://images-na.ssl-images-amazon.com/images/I/${asin}._AC_SL1500_.jpg`,
-        ]
+        // Fetch the Amazon product page
+        const pageResponse = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0'
+            }
+        })
 
-        // Test each format to find a working image
-        for (const imgUrl of imageFormats) {
-            try {
-                const response = await fetch(imgUrl, { method: 'HEAD' })
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type')
-                    if (contentType && contentType.startsWith('image/')) {
-                        return NextResponse.json({ imageUrl: imgUrl })
+        if (!pageResponse.ok) {
+            console.error('Failed to fetch Amazon page:', pageResponse.status)
+            return NextResponse.json({ imageUrl: null })
+        }
+
+        const html = await pageResponse.text()
+        const $ = cheerio.load(html)
+
+        // Try multiple selectors to find the product image
+        let imageUrl = null
+
+        // Method 1: Main product image
+        imageUrl = $('#landingImage').attr('src') || $('#landingImage').attr('data-old-hires')
+
+        // Method 2: Image block
+        if (!imageUrl) {
+            imageUrl = $('#imgBlkFront').attr('src') || $('#imgBlkFront').attr('data-old-hires')
+        }
+
+        // Method 3: Alternative main image
+        if (!imageUrl) {
+            imageUrl = $('img.a-dynamic-image').first().attr('src') || $('img.a-dynamic-image').first().attr('data-old-hires')
+        }
+
+        // Method 4: Parse from JSON data
+        if (!imageUrl) {
+            const scriptTags = $('script').toArray()
+            for (const script of scriptTags) {
+                const content = $(script).html() || ''
+
+                // Look for image data in various formats
+                const patterns = [
+                    /"hiRes":"([^"]+)"/,
+                    /"large":"([^"]+)"/,
+                    /"landingImageUrl":"([^"]+)"/,
+                ]
+
+                for (const pattern of patterns) {
+                    const match = content.match(pattern)
+                    if (match && match[1]) {
+                        imageUrl = match[1].replace(/\\u002F/g, '/').replace(/\\\//g, '/')
+                        break
                     }
                 }
-            } catch {
-                // Continue to next format
-                continue
+                if (imageUrl) break
             }
         }
 
-        // If standard formats don't work, try to scrape from the product page
-        try {
-            const pageResponse = await fetch(url, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-            })
-            const html = await pageResponse.text()
+        // Clean up the image URL
+        if (imageUrl) {
+            // Remove Amazon's dynamic sizing parameters for a clean URL
+            imageUrl = imageUrl.split('._')[0] + '.jpg'
 
-            // Extract image URL from HTML using regex
-            // Amazon uses various attributes for images
-            const imagePatterns = [
-                /"hiRes":"([^"]+)"/,
-                /"large":"([^"]+)"/,
-                /data-old-hires="([^"]+)"/,
-                /"landingImageUrl":"([^"]+)"/,
-                /data-a-dynamic-image="([^"]+)"/
-            ]
-
-            for (const pattern of imagePatterns) {
-                const match = html.match(pattern)
-                if (match && match[1]) {
-                    let imageUrl = match[1]
-                    // Handle escaped characters
-                    imageUrl = imageUrl.replace(/\\u002F/g, '/')
-                    imageUrl = imageUrl.replace(/\\\//g, '/')
-
-                    // If it's a dynamic image JSON, extract the first URL
-                    if (imageUrl.startsWith('{')) {
-                        try {
-                            const imageObj = JSON.parse(imageUrl)
-                            const firstUrl = Object.keys(imageObj)[0]
-                            if (firstUrl) {
-                                return NextResponse.json({ imageUrl: firstUrl })
-                            }
-                        } catch {
-                            continue
-                        }
-                    } else if (imageUrl.startsWith('http')) {
-                        return NextResponse.json({ imageUrl })
-                    }
-                }
+            // Ensure it's a full URL
+            if (!imageUrl.startsWith('http')) {
+                imageUrl = 'https:' + imageUrl
             }
-        } catch (error) {
-            console.error('Error scraping Amazon page:', error)
+
+            return NextResponse.json({ imageUrl })
         }
 
-        // If all methods fail, return null
         return NextResponse.json({ imageUrl: null })
     } catch (error) {
         console.error('Error fetching product image:', error)
-        return NextResponse.json({ error: 'Failed to fetch product image' }, { status: 500 })
+        return NextResponse.json({ imageUrl: null })
     }
 }
