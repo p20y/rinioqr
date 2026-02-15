@@ -26,6 +26,7 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInWithGoogle: (redirectTo?: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   refreshUserMetadata: () => Promise<void>
   canAddProduct: () => boolean
@@ -125,6 +126,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Sign in with Google OAuth
+  const signInWithGoogle = async (redirectTo?: string) => {
+    try {
+      const callbackUrl = new URL('/auth/callback', window.location.origin)
+      if (redirectTo) {
+        callbackUrl.searchParams.set('redirectTo', redirectTo)
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl.toString(),
+        },
+      })
+
+      return { error }
+    } catch (err) {
+      return { error: err as Error }
+    }
+  }
+
   // Sign out
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -152,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     refreshUserMetadata,
     canAddProduct,
